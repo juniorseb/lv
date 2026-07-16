@@ -51,7 +51,10 @@ export interface DeliveryView {
   cancelledAt: Date | null;
 }
 
-// includeCode = true seulement pour l'expéditeur propriétaire de la livraison.
+// includeCode : réservé à l'auteur de la commande ET au destinataire (c'est lui
+// qui remet le code au livreur). Jamais au livreur — il le SAISIT — ni au contact
+// de récupération. La décision se prend dans DeliveriesService.getForUser ;
+// ce mapper est la dernière barrière avant la réponse HTTP.
 export function toDeliveryView(
   delivery: Delivery,
   includeCode: boolean,
