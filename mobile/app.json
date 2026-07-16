@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "Livrechap",
+    "slug": "livrechap",
+    "version": "0.1.0",
+    "scheme": "livrechap",
+    "icon": "./assets/logo/icon-1024.png",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#FFFFFF",
+    "splash": {
+      "backgroundColor": "#FFFFFF"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "ci.favitech.livrechap"
+    },
+    "android": {
+      "package": "ci.favitech.livrechap",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ]
+    },
+    "plugins": [
+      "expo-font"
+    ]
+  }
+}

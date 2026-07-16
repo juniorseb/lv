@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" width="640" height="360">
+  <rect width="640" height="360" fill="#FFFFFF"/>
+
+  <path d="M 265 55
+           L 265 190
+           Q 265 235 310 240
+           Q 365 246 405 195"
+        fill="none"
+        stroke="#14213D"
+        stroke-width="42"
+        stroke-linecap="round"
+        stroke-linejoin="round"/>
+
+  <path d="M 300 238
+           Q 365 246 405 195"
+        fill="none"
+        stroke="#FFFFFF"
+        stroke-width="4"
+        stroke-linecap="round"
+        stroke-dasharray="14 12"/>
+
+  <circle cx="405" cy="195" r="9" fill="#FFFFFF" stroke="#14213D" stroke-width="4"/>
+
+  <text x="245" y="300" font-family="Arial, sans-serif" font-size="58" font-weight="700" fill="#14213D">Livrechap</text>
+
+  <rect x="248" y="316" width="28" height="3" fill="#14213D"/>
+  <text x="284" y="323" font-family="Arial, sans-serif" font-size="15" letter-spacing="1.5" fill="#14213D">PUBLIE. TROUVE. LIVRE.</text>
+</svg>

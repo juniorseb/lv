@@ -1,0 +1,28 @@
+# Stack de développement Livrechap : PostgreSQL + PostGIS et Redis.
+#   docker compose up -d
+# Le port hôte de la base est 5433 (le 5432 est souvent déjà pris par un
+# PostgreSQL local) — voir DB_PORT dans backend/.env.
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: livrechap
+    ports:
+      - '5433:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d livrechap']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    volumes:
+      - livrechap_pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - '6379:6379'
+
+volumes:
+  livrechap_pgdata:

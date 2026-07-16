@@ -1,0 +1,454 @@
+Je pense même que cette fonctionnalité est **P0**. Une livraison sans possibilité de communiquer crée rapidement des situations bloquantes (portail fermé, mauvaise adresse, client absent, etc.).
+
+Je structurerais la fonctionnalité autour d'un principe simple :
+
+> **Communiquer doit être immédiat, mais uniquement lorsqu'une mission existe.**
+
+Voici la spec.
+
+````markdown
+# Spec — Communication Client ↔ Livreur
+## Appel direct & Messagerie intégrée (P0)
+
+## Objectif
+
+Permettre au client et au livreur de communiquer facilement pendant une livraison.
+
+La communication doit être :
+
+- simple ;
+- rapide ;
+- contextualisée à une mission ;
+- non intrusive.
+
+Le téléphone n'est pas un réseau social.
+
+La communication existe uniquement pour permettre la réussite de la livraison.
+
+---
+
+# 1. Principes UX
+
+LivreChap ne cherche pas à devenir WhatsApp.
+
+Le but est simplement de résoudre rapidement un problème de livraison.
+
+Le parcours idéal est :
+
+```
+Besoin
+↓
+1 clic
+↓
+Communication
+↓
+Livraison réussie
+```
+
+---
+
+# 2. Disponibilité de la communication
+
+La communication est autorisée uniquement lorsqu'une mission existe.
+
+États :
+
+| Statut mission | Appel | Messages |
+|---------------|--------|----------|
+| Recherche livreur | ❌ | ❌ |
+| Mission acceptée | ✅ | ✅ |
+| Livreur en route récupération | ✅ | ✅ |
+| Colis récupéré | ✅ | ✅ |
+| Livraison en cours | ✅ | ✅ |
+| Livraison terminée | ❌ | Lecture seule |
+| Mission annulée | ❌ | Lecture seule |
+
+---
+
+# 3. Bouton Appeler
+
+Le bouton est présent sur les deux interfaces.
+
+Client :
+
+```
+Jean arrive.
+
+[ Appeler ]
+
+[ Message ]
+```
+
+Livreur :
+
+```
+Client : Bernard
+
+[ Appeler ]
+
+[ Message ]
+```
+
+---
+
+# 4. Fonctionnement de l'appel
+
+Lorsque l'utilisateur appuie sur :
+
+```
+Appeler
+```
+
+L'application ouvre directement le composeur téléphonique natif.
+
+Aucune VoIP.
+
+Aucun appel dans l'application.
+
+Le numéro réel est utilisé.
+
+---
+
+# 5. Confirmation
+
+Avant le premier appel uniquement.
+
+Popup :
+
+```
+Appeler Bernard ?
+
+Vous allez utiliser votre réseau téléphonique.
+
+[Annuler]
+
+[Appeler]
+```
+
+Ne plus afficher cette confirmation ensuite.
+
+---
+
+# 6. Messagerie
+
+Chaque mission possède sa conversation.
+
+Une mission = une conversation.
+
+La conversation disparaît des écrans actifs après la mission mais reste consultable dans l'historique.
+
+---
+
+# 7. Interface
+
+```
+Bernard
+
+Mission #4582
+
+--------------------------------
+
+Bonjour.
+
+Je suis arrivé.
+
+--------------------------------
+
+Le portail est fermé.
+
+--------------------------------
+
+J'arrive.
+
+```
+
+En bas :
+
+```
+Écrire un message...
+
+[Envoyer]
+```
+
+---
+
+# 8. Messages rapides
+
+Avant de taper du texte, proposer des messages prédéfinis.
+
+Client :
+
+• J'arrive.
+
+• Merci de patienter.
+
+• Le portail est ouvert.
+
+• Appelez-moi.
+
+• Je suis à l'intérieur.
+
+---
+
+Livreur :
+
+• Je suis arrivé.
+
+• Je suis devant.
+
+• Je cherche votre adresse.
+
+• Je serai là dans 5 minutes.
+
+• Merci de répondre.
+
+• Je repars dans quelques minutes si je n'ai pas de réponse.
+
+Les messages rapides doivent être accessibles en un clic.
+
+---
+
+# 9. Notifications
+
+Chaque nouveau message déclenche une notification.
+
+Exemple :
+
+```
+Jean :
+
+Je suis devant votre portail.
+```
+
+Si la conversation est ouverte :
+
+aucune notification système.
+
+Seulement une animation discrète.
+
+---
+
+# 10. Pièces jointes
+
+P0 :
+
+❌ aucun fichier
+
+❌ aucune image
+
+❌ aucun document
+
+Seulement :
+
+texte.
+
+Les photos de preuve de livraison restent dans le workflow de livraison, pas dans le chat.
+
+---
+
+# 11. Historique
+
+Après la mission :
+
+Historique >
+
+Mission >
+
+Conversation
+
+Lecture seule.
+
+Impossible d'envoyer un nouveau message.
+
+---
+
+# 12. États de la conversation
+
+Chargement
+
+```
+Chargement...
+```
+
+Vide
+
+```
+Commencez la conversation.
+
+Exemple :
+
+"Je suis arrivé."
+```
+
+Erreur
+
+```
+Impossible d'envoyer le message.
+
+Réessayer.
+```
+
+---
+
+# 13. Sécurité
+
+Chaque conversation est liée à :
+
+- mission ;
+- client ;
+- livreur.
+
+Impossible :
+
+- de créer une conversation sans mission ;
+- d'écrire à un autre utilisateur.
+
+---
+
+# 14. Suppression
+
+Aucune suppression individuelle.
+
+Les messages restent disponibles dans l'historique de la mission.
+
+---
+
+# 15. UX
+
+La messagerie doit être extrêmement simple.
+
+Pas :
+
+❌ accusés de lecture
+
+❌ réactions emoji
+
+❌ GIF
+
+❌ stickers
+
+❌ audio
+
+❌ appels vidéo
+
+❌ partage de position
+
+Le but est :
+
+résoudre une livraison.
+
+---
+
+# 16. Priorité des actions
+
+Sur une mission active :
+
+1.
+
+Navigation
+
+2.
+
+Appeler
+
+3.
+
+Message
+
+Le téléphone sert d'abord à livrer.
+
+---
+
+# 17. Cas d'usage
+
+Client
+
+```
+Livreur :
+
+Je suis devant.
+
+↓
+
+Client :
+
+J'arrive.
+```
+
+---
+
+Livreur
+
+```
+Impossible de trouver l'entrée.
+
+↓
+
+Client :
+
+Entrez par le portail bleu.
+```
+
+---
+
+Restaurant
+
+```
+Votre commande est prête.
+```
+
+---
+
+# 18. Définition de terminé
+
+La fonctionnalité est validée lorsque :
+
+✅ un client peut appeler son livreur
+
+✅ un livreur peut appeler son client
+
+✅ une conversation est créée automatiquement dès l'acceptation d'une mission
+
+✅ les messages sont envoyés en temps réel
+
+✅ les notifications fonctionnent
+
+✅ les messages rapides sont disponibles
+
+✅ la conversation passe automatiquement en lecture seule après la fin ou l'annulation de la mission
+
+✅ aucune communication n'est possible sans mission active
+````
+
+## Une amélioration que je recommande
+
+J'ajouterais un **centre d'actions rapide** juste au-dessus de la zone de saisie. Dans la pratique, 80 à 90 % des échanges pendant une livraison sont toujours les mêmes.
+
+Par exemple :
+
+```
+──────────────
+
+📞 Appeler
+
+──────────────
+
+⚡ Messages rapides
+
+[Je suis arrivé]
+
+[J'arrive]
+
+[Je suis devant]
+
+[Appelez-moi]
+
+[Merci]
+
+──────────────
+
+Écrire un message...
+
+```
+
+Ainsi, dans la majorité des cas, l'utilisateur n'a même pas besoin de taper du texte. C'est plus rapide, plus sûr (surtout pour le livreur) et parfaitement aligné avec la philosophie de simplicité de LivreChap.
