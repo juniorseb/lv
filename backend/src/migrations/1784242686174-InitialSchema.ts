@@ -1,0 +1,166 @@
+import { MigrationInterface, QueryRunner } from "typeorm";
+
+export class InitialSchema1784242686174 implements MigrationInterface {
+    name = 'InitialSchema1784242686174'
+
+    public async up(queryRunner: QueryRunner): Promise<void> {
+        // TypeORM ne génère JAMAIS les extensions : ajoutées à la main, sinon la
+        // migration échoue sur une base neuve. postgis → colonnes geography
+        // (positions livreurs, points de retrait) ; uuid-ossp → uuid_generate_v4().
+        // Jamais supprimées dans down() : d'autres schémas peuvent en dépendre.
+        await queryRunner.query(`CREATE EXTENSION IF NOT EXISTS postgis`);
+        await queryRunner.query(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`);
+        await queryRunner.query(`CREATE TYPE "public"."users_account_type_enum" AS ENUM('particulier', 'commerce')`);
+        await queryRunner.query(`CREATE TYPE "public"."users_verification_level_enum" AS ENUM('standard', 'verifie')`);
+        await queryRunner.query(`CREATE TYPE "public"."users_id_document_type_enum" AS ENUM('cni', 'passeport')`);
+        await queryRunner.query(`CREATE TABLE "users" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "phone_number" character varying(20) NOT NULL, "phone_verified" boolean NOT NULL DEFAULT false, "account_type" "public"."users_account_type_enum" NOT NULL DEFAULT 'particulier', "full_name" character varying(150), "selfie_url" text, "commune" character varying(100), "email" character varying(150), "date_naissance" date, "emergency_contact_name" character varying(150), "emergency_contact_phone" character varying(20), "verification_level" "public"."users_verification_level_enum" NOT NULL DEFAULT 'standard', "id_document_url" text, "id_document_type" "public"."users_id_document_type_enum", "is_active" boolean NOT NULL DEFAULT true, "active_role" character varying(20), "is_admin" boolean NOT NULL DEFAULT false, "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "UQ_17d1817f241f10a3dbafb169fd2" UNIQUE ("phone_number"), CONSTRAINT "PK_a3ffb1c0c8416b9fc6f907b7433" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE TYPE "public"."driver_profiles_vehicle_type_enum" AS ENUM('moto', 'voiture', 'velo', 'a_pied', 'camionnette')`);
+        await queryRunner.query(`CREATE TABLE "driver_profiles" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "user_id" uuid NOT NULL, "vehicle_type" "public"."driver_profiles_vehicle_type_enum" NOT NULL, "status" character varying(20) NOT NULL DEFAULT 'en_validation', "zones" character varying(300), "mobile_money_operator" character varying(10), "mobile_money_number" character varying(20), "mobile_money_holder" character varying(150), "is_available" boolean NOT NULL DEFAULT false, "current_location" geography(Point,4326), "location_updated_at" TIMESTAMP WITH TIME ZONE, "rating_average" numeric(2,1) NOT NULL DEFAULT '5', "total_deliveries" integer NOT NULL DEFAULT '0', "no_show_count" integer NOT NULL DEFAULT '0', "suspended_until" TIMESTAMP WITH TIME ZONE, "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "PK_6e002fc8a835351e070978fcad4" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "idx_driver_location" ON "driver_profiles" USING GiST ("current_location") `);
+        await queryRunner.query(`CREATE TABLE "wallets" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "driver_id" uuid NOT NULL, "balance_fcfa" integer NOT NULL DEFAULT '0', "welcome_bonus_claimed" boolean NOT NULL DEFAULT false, "low_balance_alert_threshold" integer NOT NULL DEFAULT '300', "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "UQ_7259be115b1280d8e19cf90bc79" UNIQUE ("driver_id"), CONSTRAINT "REL_7259be115b1280d8e19cf90bc7" UNIQUE ("driver_id"), CONSTRAINT "PK_8402e5df5a30a229380e83e4f7e" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE TYPE "public"."wallet_transactions_type_enum" AS ENUM('recharge', 'commission', 'bonus', 'ajustement')`);
+        await queryRunner.query(`CREATE TYPE "public"."wallet_transactions_provider_enum" AS ENUM('orange_money', 'wave', 'systeme')`);
+        await queryRunner.query(`CREATE TABLE "wallet_transactions" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "wallet_id" uuid NOT NULL, "type" "public"."wallet_transactions_type_enum" NOT NULL, "amount_fcfa" integer NOT NULL, "provider" "public"."wallet_transactions_provider_enum", "provider_reference" character varying(150), "delivery_id" uuid, "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "PK_5120f131bde2cda940ec1a621db" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "idx_wallet_tx_delivery" ON "wallet_transactions" ("delivery_id") `);
+        await queryRunner.query(`CREATE TABLE "sos_alerts" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "user_id" uuid NOT NULL, "role" character varying(10) NOT NULL, "delivery_id" uuid, "latitude" numeric(9,6) NOT NULL, "longitude" numeric(9,6) NOT NULL, "last_latitude" numeric(9,6), "last_longitude" numeric(9,6), "location_updated_at" TIMESTAMP WITH TIME ZONE, "status" character varying(10) NOT NULL DEFAULT 'active', "resolved_by" uuid, "resolved_at" TIMESTAMP WITH TIME ZONE, "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "PK_5c6f2f5f40ab2224315e007b9c4" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "idx_sos_user" ON "sos_alerts" ("user_id") `);
+        await queryRunner.query(`CREATE INDEX "idx_sos_status" ON "sos_alerts" ("status") `);
+        await queryRunner.query(`CREATE TYPE "public"."vehicles_vehicle_type_enum" AS ENUM('moto', 'voiture', 'velo', 'a_pied', 'camionnette')`);
+        await queryRunner.query(`CREATE TABLE "vehicles" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "driver_id" uuid NOT NULL, "vehicle_type" "public"."vehicles_vehicle_type_enum" NOT NULL, "marque" character varying(60), "modele" character varying(60), "annee" integer, "couleur" character varying(40), "immatriculation" character varying(30), "photo_avant_url" text, "photo_arriere_url" text, "photo_plaque_url" text, "capacite_max_colis" integer, "capacite_poids_kg" integer, "is_active" boolean NOT NULL DEFAULT true, "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "PK_18d8646b59304dce4af3a9e35b6" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "idx_vehicle_driver" ON "vehicles" ("driver_id") `);
+        await queryRunner.query(`CREATE TABLE "commerce_profiles" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "user_id" uuid NOT NULL, "shop_name" character varying(150), "default_address" text, "default_location" geography(Point,4326), "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "PK_66b300881c5301714f8baf3c983" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE TABLE "driver_documents" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "driver_id" uuid NOT NULL, "type_document" character varying(30) NOT NULL, "url" text NOT NULL, "status" character varying(20) NOT NULL DEFAULT 'en_attente', "date_expiration" date, "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "PK_31c28b4e8f55a5d411597d45ab2" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "idx_driver_document_driver" ON "driver_documents" ("driver_id") `);
+        await queryRunner.query(`CREATE TABLE "device_tokens" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "user_id" uuid NOT NULL, "token" text NOT NULL, "platform" character varying(20) NOT NULL DEFAULT 'android', "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "UQ_977e24c520c49436d08e5eeea8a" UNIQUE ("token"), CONSTRAINT "PK_84700be257607cfb1f9dc2e52c3" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "idx_device_tokens_user" ON "device_tokens" ("user_id") `);
+        await queryRunner.query(`CREATE TYPE "public"."deliveries_matching_mode_enum" AS ENUM('rapide', 'choix')`);
+        await queryRunner.query(`CREATE TYPE "public"."deliveries_status_enum" AS ENUM('recherche', 'livreur_trouve', 'colis_recupere', 'terminee', 'annulee', 'expiree')`);
+        await queryRunner.query(`CREATE TABLE "deliveries" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "sender_id" uuid NOT NULL, "driver_id" uuid, "pickup_address" text NOT NULL, "pickup_location" geography(Point,4326) NOT NULL, "dropoff_address" text NOT NULL, "dropoff_location" geography(Point,4326) NOT NULL, "recipient_name" character varying(150), "recipient_phone" character varying(20), "pickup_contact_name" character varying(150), "pickup_contact_phone" character varying(20), "pickup_note" character varying(150), "dropoff_note" character varying(150), "price_fcfa" integer NOT NULL, "package_type" character varying(50), "description" text, "photo_url" text, "matching_mode" "public"."deliveries_matching_mode_enum" NOT NULL DEFAULT 'rapide', "urgency" character varying(10) NOT NULL DEFAULT 'normal', "scheduled_at" TIMESTAMP WITH TIME ZONE, "is_cod" boolean NOT NULL DEFAULT false, "cod_article_amount_fcfa" integer, "search_radius_km" numeric(4,1) NOT NULL DEFAULT '2', "expires_at" TIMESTAMP WITH TIME ZONE, "notified_ring_index" integer NOT NULL DEFAULT '0', "status" "public"."deliveries_status_enum" NOT NULL DEFAULT 'recherche', "delivery_code" character(4), "delivery_request_id" uuid, "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "matched_at" TIMESTAMP WITH TIME ZONE, "picked_up_at" TIMESTAMP WITH TIME ZONE, "completed_at" TIMESTAMP WITH TIME ZONE, "cancelled_at" TIMESTAMP WITH TIME ZONE, "cancel_reason" character varying(40), CONSTRAINT "PK_a6ef225c5c5f0974e503bfb731f" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "idx_deliveries_pickup_location" ON "deliveries" USING GiST ("pickup_location") `);
+        await queryRunner.query(`CREATE INDEX "idx_deliveries_expires_at" ON "deliveries" ("expires_at") `);
+        await queryRunner.query(`CREATE INDEX "idx_deliveries_status" ON "deliveries" ("status") `);
+        await queryRunner.query(`CREATE TABLE "messages" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "delivery_id" uuid NOT NULL, "sender_id" uuid NOT NULL, "sender_role" character varying(10) NOT NULL, "body" character varying(1000) NOT NULL, "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "PK_18325f38ae6de43878487eff986" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "idx_message_delivery" ON "messages" ("delivery_id") `);
+        await queryRunner.query(`CREATE TABLE "delivery_requests" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "client_id" uuid NOT NULL, "type" character varying(20) NOT NULL DEFAULT 'single', "depart_address" text, "depart_location" geography(Point,4326), "status_global" character varying(20) NOT NULL DEFAULT 'en_cours', "total_price_fcfa" integer NOT NULL DEFAULT '0', "urgency" character varying(10) NOT NULL DEFAULT 'normal', "scheduled_at" TIMESTAMP WITH TIME ZONE, "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "PK_78f69c489c0bb2cc79ea1578b90" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "idx_delivery_request_status" ON "delivery_requests" ("status_global") `);
+        await queryRunner.query(`CREATE TABLE "routes" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "delivery_request_id" uuid NOT NULL, "driver_id" uuid, "distance_estimee_m" numeric(10,1), "gain_total_fcfa" integer, "commission_totale_fcfa" integer, "status" character varying(20) NOT NULL DEFAULT 'en_attente', "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "PK_76100511cdfa1d013c859f01d8b" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "idx_route_request" ON "routes" ("delivery_request_id") `);
+        await queryRunner.query(`CREATE INDEX "idx_route_driver" ON "routes" ("driver_id") `);
+        await queryRunner.query(`CREATE TABLE "stops" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "route_id" uuid NOT NULL, "recipient_name" character varying(150), "recipient_phone" character varying(20), "address" text NOT NULL, "location" geography(Point,4326), "landmark" character varying(150), "price_fcfa" integer NOT NULL DEFAULT '0', "order_index" integer NOT NULL DEFAULT '0', "status" character varying(20) NOT NULL DEFAULT 'en_attente', "proof_otp" character(4), "proof_photo_url" text, "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "PK_ed1be877403ad3c921b07f62ca5" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "idx_stop_route" ON "stops" ("route_id") `);
+        await queryRunner.query(`CREATE TABLE "packages" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "stop_id" uuid NOT NULL, "description_produit" text, "valeur_declaree_fcfa" integer, "poids_kg" numeric(6,2), "fragile" boolean NOT NULL DEFAULT false, "status" character varying(20) NOT NULL DEFAULT 'cree', "proof_collection_photo_url" text, "proof_collection_code" character varying(10), "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "PK_020801f620e21f943ead9311c98" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "idx_package_stop" ON "packages" ("stop_id") `);
+        await queryRunner.query(`CREATE TABLE "tracking_events" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "package_id" uuid NOT NULL, "type_evenement" character varying(40) NOT NULL, "details" text, "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "PK_cc22ae68e05d9ba5a6575a6f429" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "idx_tracking_package" ON "tracking_events" ("package_id") `);
+        await queryRunner.query(`CREATE TABLE "payment_collections" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "package_id" uuid NOT NULL, "montant_a_collecter_fcfa" integer NOT NULL, "livreur_collecteur_id" uuid, "statut" character varying(20) NOT NULL DEFAULT 'en_attente', "date_reception" TIMESTAMP WITH TIME ZONE, "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "PK_b05a6bed18bd4e99908542996bd" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE TABLE "delivery_offers" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "delivery_request_id" uuid NOT NULL, "driver_id" uuid NOT NULL, "prix_propose_fcfa" integer NOT NULL, "statut" character varying(20) NOT NULL DEFAULT 'en_attente', "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "PK_335377b132db63eaf2c373d04ba" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE TABLE "recurring_deliveries" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "entreprise_id" uuid NOT NULL, "frequency" character varying(20) NOT NULL, "heure_depart" character varying(5), "livreur_prefere_id" uuid, "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "PK_d9f9d9308499e9c2ba1bde74eb1" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE TABLE "vehicle_capacity" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "vehicle_id" uuid NOT NULL, "capacite_poids_kg" integer, "capacite_volume_litres" integer, "capacite_max_colis" integer, CONSTRAINT "PK_8b3925d7e5a1664a234bf401e67" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE TABLE "delivery_items" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "stop_id" uuid NOT NULL, "name" character varying(120) NOT NULL, "quantity" integer NOT NULL DEFAULT '1', "notes" character varying(200), "status" character varying(20) NOT NULL DEFAULT 'pending', "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "PK_421035bb04c4c87c2b220e5fa8b" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "idx_delivery_item_stop" ON "delivery_items" ("stop_id") `);
+        await queryRunner.query(`CREATE TYPE "public"."delivery_incidents_type_enum" AS ENUM('no_show_livreur', 'annulation_client', 'refus_apres_acceptation')`);
+        await queryRunner.query(`CREATE TABLE "delivery_incidents" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "delivery_id" uuid NOT NULL, "user_id" uuid NOT NULL, "type" "public"."delivery_incidents_type_enum" NOT NULL, "reason" character varying(40), "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "PK_5025584459ee2c6563f3fb28a76" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE TABLE "saved_addresses" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "user_id" uuid NOT NULL, "label" character varying(60) NOT NULL, "address" character varying(300) NOT NULL, "latitude" double precision NOT NULL, "longitude" double precision NOT NULL, "landmark" character varying(150), "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "PK_2dcd5492d2ac696c133d461db8b" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "idx_saved_address_user" ON "saved_addresses" ("user_id") `);
+        await queryRunner.query(`ALTER TABLE "driver_profiles" ADD CONSTRAINT "FK_cec43742cd6dea0e8fcae3e29d8" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "wallets" ADD CONSTRAINT "FK_7259be115b1280d8e19cf90bc79" FOREIGN KEY ("driver_id") REFERENCES "driver_profiles"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "wallet_transactions" ADD CONSTRAINT "FK_c57d19129968160f4db28fc8b28" FOREIGN KEY ("wallet_id") REFERENCES "wallets"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "sos_alerts" ADD CONSTRAINT "FK_7a5209ca217c11fd1c5767d1450" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "vehicles" ADD CONSTRAINT "FK_9c2e0a8772c9e43b32f57bfcfcc" FOREIGN KEY ("driver_id") REFERENCES "driver_profiles"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "commerce_profiles" ADD CONSTRAINT "FK_5feab5ea09bd85a70183b587d67" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "driver_documents" ADD CONSTRAINT "FK_dc156b37dfa0fcda0ef1974bab8" FOREIGN KEY ("driver_id") REFERENCES "driver_profiles"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "device_tokens" ADD CONSTRAINT "FK_17e1f528b993c6d55def4cf5bea" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "deliveries" ADD CONSTRAINT "FK_0d8f91dd31f069d047246b2b904" FOREIGN KEY ("sender_id") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "deliveries" ADD CONSTRAINT "FK_0bb1b190c636bee8f5cafd239ef" FOREIGN KEY ("driver_id") REFERENCES "driver_profiles"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "messages" ADD CONSTRAINT "FK_d030aa5e7c96396b592ba647e33" FOREIGN KEY ("delivery_id") REFERENCES "deliveries"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "messages" ADD CONSTRAINT "FK_22133395bd13b970ccd0c34ab22" FOREIGN KEY ("sender_id") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "delivery_requests" ADD CONSTRAINT "FK_4e3ee330346fbccbcdb049f66cc" FOREIGN KEY ("client_id") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "routes" ADD CONSTRAINT "FK_6f4fab488141ca0c6ee0bbf7101" FOREIGN KEY ("delivery_request_id") REFERENCES "delivery_requests"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "routes" ADD CONSTRAINT "FK_b24793975c0b6d169abb714b2a6" FOREIGN KEY ("driver_id") REFERENCES "driver_profiles"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "stops" ADD CONSTRAINT "FK_dbc2394dc0bac04d772498dc503" FOREIGN KEY ("route_id") REFERENCES "routes"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "packages" ADD CONSTRAINT "FK_73d03967d9294d158f48967d45d" FOREIGN KEY ("stop_id") REFERENCES "stops"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "tracking_events" ADD CONSTRAINT "FK_7edb7879e6620f325280bc0a53b" FOREIGN KEY ("package_id") REFERENCES "packages"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "delivery_items" ADD CONSTRAINT "FK_ed914e90f839213005b7067aa8c" FOREIGN KEY ("stop_id") REFERENCES "stops"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "delivery_incidents" ADD CONSTRAINT "FK_bab6780701761e94d2f488b3073" FOREIGN KEY ("delivery_id") REFERENCES "deliveries"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "delivery_incidents" ADD CONSTRAINT "FK_acb95f513d41ea896caf00763dd" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "saved_addresses" ADD CONSTRAINT "FK_ade7e74acf7fd9b7e487757a11b" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+    }
+
+    public async down(queryRunner: QueryRunner): Promise<void> {
+        await queryRunner.query(`ALTER TABLE "saved_addresses" DROP CONSTRAINT "FK_ade7e74acf7fd9b7e487757a11b"`);
+        await queryRunner.query(`ALTER TABLE "delivery_incidents" DROP CONSTRAINT "FK_acb95f513d41ea896caf00763dd"`);
+        await queryRunner.query(`ALTER TABLE "delivery_incidents" DROP CONSTRAINT "FK_bab6780701761e94d2f488b3073"`);
+        await queryRunner.query(`ALTER TABLE "delivery_items" DROP CONSTRAINT "FK_ed914e90f839213005b7067aa8c"`);
+        await queryRunner.query(`ALTER TABLE "tracking_events" DROP CONSTRAINT "FK_7edb7879e6620f325280bc0a53b"`);
+        await queryRunner.query(`ALTER TABLE "packages" DROP CONSTRAINT "FK_73d03967d9294d158f48967d45d"`);
+        await queryRunner.query(`ALTER TABLE "stops" DROP CONSTRAINT "FK_dbc2394dc0bac04d772498dc503"`);
+        await queryRunner.query(`ALTER TABLE "routes" DROP CONSTRAINT "FK_b24793975c0b6d169abb714b2a6"`);
+        await queryRunner.query(`ALTER TABLE "routes" DROP CONSTRAINT "FK_6f4fab488141ca0c6ee0bbf7101"`);
+        await queryRunner.query(`ALTER TABLE "delivery_requests" DROP CONSTRAINT "FK_4e3ee330346fbccbcdb049f66cc"`);
+        await queryRunner.query(`ALTER TABLE "messages" DROP CONSTRAINT "FK_22133395bd13b970ccd0c34ab22"`);
+        await queryRunner.query(`ALTER TABLE "messages" DROP CONSTRAINT "FK_d030aa5e7c96396b592ba647e33"`);
+        await queryRunner.query(`ALTER TABLE "deliveries" DROP CONSTRAINT "FK_0bb1b190c636bee8f5cafd239ef"`);
+        await queryRunner.query(`ALTER TABLE "deliveries" DROP CONSTRAINT "FK_0d8f91dd31f069d047246b2b904"`);
+        await queryRunner.query(`ALTER TABLE "device_tokens" DROP CONSTRAINT "FK_17e1f528b993c6d55def4cf5bea"`);
+        await queryRunner.query(`ALTER TABLE "driver_documents" DROP CONSTRAINT "FK_dc156b37dfa0fcda0ef1974bab8"`);
+        await queryRunner.query(`ALTER TABLE "commerce_profiles" DROP CONSTRAINT "FK_5feab5ea09bd85a70183b587d67"`);
+        await queryRunner.query(`ALTER TABLE "vehicles" DROP CONSTRAINT "FK_9c2e0a8772c9e43b32f57bfcfcc"`);
+        await queryRunner.query(`ALTER TABLE "sos_alerts" DROP CONSTRAINT "FK_7a5209ca217c11fd1c5767d1450"`);
+        await queryRunner.query(`ALTER TABLE "wallet_transactions" DROP CONSTRAINT "FK_c57d19129968160f4db28fc8b28"`);
+        await queryRunner.query(`ALTER TABLE "wallets" DROP CONSTRAINT "FK_7259be115b1280d8e19cf90bc79"`);
+        await queryRunner.query(`ALTER TABLE "driver_profiles" DROP CONSTRAINT "FK_cec43742cd6dea0e8fcae3e29d8"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_saved_address_user"`);
+        await queryRunner.query(`DROP TABLE "saved_addresses"`);
+        await queryRunner.query(`DROP TABLE "delivery_incidents"`);
+        await queryRunner.query(`DROP TYPE "public"."delivery_incidents_type_enum"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_delivery_item_stop"`);
+        await queryRunner.query(`DROP TABLE "delivery_items"`);
+        await queryRunner.query(`DROP TABLE "vehicle_capacity"`);
+        await queryRunner.query(`DROP TABLE "recurring_deliveries"`);
+        await queryRunner.query(`DROP TABLE "delivery_offers"`);
+        await queryRunner.query(`DROP TABLE "payment_collections"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_tracking_package"`);
+        await queryRunner.query(`DROP TABLE "tracking_events"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_package_stop"`);
+        await queryRunner.query(`DROP TABLE "packages"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_stop_route"`);
+        await queryRunner.query(`DROP TABLE "stops"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_route_driver"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_route_request"`);
+        await queryRunner.query(`DROP TABLE "routes"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_delivery_request_status"`);
+        await queryRunner.query(`DROP TABLE "delivery_requests"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_message_delivery"`);
+        await queryRunner.query(`DROP TABLE "messages"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_deliveries_status"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_deliveries_expires_at"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_deliveries_pickup_location"`);
+        await queryRunner.query(`DROP TABLE "deliveries"`);
+        await queryRunner.query(`DROP TYPE "public"."deliveries_status_enum"`);
+        await queryRunner.query(`DROP TYPE "public"."deliveries_matching_mode_enum"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_device_tokens_user"`);
+        await queryRunner.query(`DROP TABLE "device_tokens"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_driver_document_driver"`);
+        await queryRunner.query(`DROP TABLE "driver_documents"`);
+        await queryRunner.query(`DROP TABLE "commerce_profiles"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_vehicle_driver"`);
+        await queryRunner.query(`DROP TABLE "vehicles"`);
+        await queryRunner.query(`DROP TYPE "public"."vehicles_vehicle_type_enum"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_sos_status"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_sos_user"`);
+        await queryRunner.query(`DROP TABLE "sos_alerts"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_wallet_tx_delivery"`);
+        await queryRunner.query(`DROP TABLE "wallet_transactions"`);
+        await queryRunner.query(`DROP TYPE "public"."wallet_transactions_provider_enum"`);
+        await queryRunner.query(`DROP TYPE "public"."wallet_transactions_type_enum"`);
+        await queryRunner.query(`DROP TABLE "wallets"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_driver_location"`);
+        await queryRunner.query(`DROP TABLE "driver_profiles"`);
+        await queryRunner.query(`DROP TYPE "public"."driver_profiles_vehicle_type_enum"`);
+        await queryRunner.query(`DROP TABLE "users"`);
+        await queryRunner.query(`DROP TYPE "public"."users_id_document_type_enum"`);
+        await queryRunner.query(`DROP TYPE "public"."users_verification_level_enum"`);
+        await queryRunner.query(`DROP TYPE "public"."users_account_type_enum"`);
+    }
+
+}
