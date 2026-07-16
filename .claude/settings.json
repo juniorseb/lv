@@ -2,7 +2,13 @@
   "permissions": {
     "allow": [
       "Bash(npx tsc *)",
-      "Bash(npx jest *)"
+      "Bash(npx jest *)",
+      "Bash(npm install *)",
+      "Bash(node -e \"console.log\\('@nestjs/testing:', require\\('./node_modules/@nestjs/testing/package.json'\\).version, '| supertest:', require\\('./node_modules/supertest/package.json'\\).version\\)\")",
+      "Bash(npm run *)",
+      "Bash(grep -vE \"^\\\\s*$|Nest\\\\]|RouterExplorer|RoutesResolver|InstanceLoader|NestFactory|NestApplication|SmsService|console.log\")",
+      "Bash(echo \"exit: $?\")",
+      "Bash(xargs echo \"  fichiers de test dans dist/ \\(doit etre 0\\) :\")"
     ]
   }
 }
