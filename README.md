@@ -4,55 +4,124 @@ La marketplace instantanée de livraison locale — Abidjan, Côte d'Ivoire.
 
 **Publie. Trouve. Livre.**
 
-## Structure du projet
+Le client publie une course et fixe son prix. Les livreurs disponibles autour du
+point de récupération la voient et l'acceptent. **Le client paie le livreur en
+direct** : Livrechap ne fait que prélever une commission sur un crédit interne.
+
+## Structure
 
 ```
 livrechap-project/
-├── mobile/          Application React Native (Expo) — Expéditeur + Livreur
-├── backend/         API NestJS — Auth, Deliveries, Matching, Wallet, etc.
-├── database/        Schéma PostgreSQL + PostGIS
-└── docs/            Dossier projet complet (vision, roadmap, stack)
+├── backend/         API NestJS — auth, deliveries, matching, wallet, tournées…
+├── mobile/          Application Expo (React Native) — Expéditeur + Livreur
+├── admin/           Back-office React (Vite) — validation, suivi, alertes
+├── database/        Schéma de référence (historique — voir « Migrations »)
+└── docs/            Dossier projet (vision, cible, UX, modèle économique)
 ```
 
-## Reprendre le projet dans Claude Code
+## Démarrer
 
-Ce dépôt est un point de départ, pas un projet fini. Tout le raisonnement produit
-(vision, cible, UX, matching, confiance, modèle économique, roadmap) est dans
-`docs/livrechap-projet-complet.md` — à lire en premier pour garder le contexte.
+```bash
+# 1. Base de données (PostgreSQL + PostGIS) et Redis
+docker compose up -d
 
-### Étapes suggérées avec Claude Code
+# 2. Backend
+cd backend
+npm install
+cp .env.example .env          # ajuster si besoin (DB_PORT=5433 par défaut)
+npm run migration:run         # crée le schéma
+npm run start:dev             # http://localhost:3000
 
-1. `cd backend && npm install` — installer les dépendances NestJS
-2. Configurer `.env` à partir de `.env.example` (PostgreSQL, Redis, Firebase, Orange
-   Money/Wave, Mapbox)
-3. Lancer PostgreSQL avec PostGIS (`docker compose up -d` si tu ajoutes un
-   `docker-compose.yml`, ou une base managée type Railway/Supabase)
-4. Appliquer `database/schema.sql`
-5. `npm run start:dev` côté backend
-6. `cd mobile && npm install && npx expo start` — scanner le QR code avec
-   l'app Expo Go sur ton téléphone
+# 3. Mobile (Expo Go sur téléphone)
+cd ../mobile
+npm install --legacy-peer-deps
+npx expo start                # scanner le QR code
 
-### Ce qui est déjà posé
+# 4. Back-office
+cd ../admin
+npm install
+npm run dev
+```
 
-- Arborescence des modules backend (un dossier par domaine métier)
-- Schéma de base de données initial (utilisateurs, profils livreur/commerce,
-  livraisons, portefeuille, transactions, notes)
-- Squelette mobile Expo avec thème de couleurs Livrechap et navigation de base
-- Variables d'environnement type
+En développement, le code OTP est fixe : **`000000`** (`OTP_DEV_BYPASS_CODE`).
+Il est neutralisé de force dès que `NODE_ENV=production`.
 
-### Ce qu'il reste à faire (dans l'ordre logique)
+Un administrateur se crée en base : `UPDATE users SET is_admin = true WHERE …`.
 
-1. Implémenter le module `auth` (OTP téléphone)
-2. Implémenter `users` / `profiles` (particulier, livreur, commerce)
-3. Implémenter `deliveries` (création, statuts, code de livraison)
-4. Implémenter `matching` (cercle progressif PostGIS + Redis)
-5. Implémenter `wallet` (crédit Livrechap, recharge, commission)
-6. Brancher les notifications (Firebase Cloud Messaging)
-7. Construire les écrans mobiles dans l'ordre du parcours Expéditeur, puis Livreur
-8. Admin dashboard (validation CNI, litiges, statistiques)
+## Ce qui est construit
+
+**Backend** — auth OTP (code haché, anti-abus, JWT access/refresh) · profils
+particulier / livreur / commerce · livraisons avec code de remise à 4 chiffres ·
+matching PostGIS à **cercle progressif temporel** (2 km, puis 5 km à 15 s, puis
+10 km à 30 s) · plafonds propres aux vélos et livreurs à pied · expiration de la
+recherche après 3 min · tournées multi-arrêts avec négociation de prix ·
+portefeuille-caution et commission · messagerie de mission · Livrechap Protect
+(SOS) · uploads · géocodage.
+
+**Mobile** — parcours Expéditeur complet (publication, suivi carte, republication)
+et Livreur (disponibilité, feed avec décompte, mission, caution, documents,
+véhicules), bascule de rôle, historique, messagerie, SOS.
+
+**Back-office** — statistiques, validation des pièces d'identité, validation et
+suspension des livreurs, alertes SOS en temps réel.
+
+### Deux notions à ne pas confondre
+
+- **L'auteur de la commande** (`sender_id`) publie et paie. Lui seul peut annuler
+  ou republier.
+- **Le contact de récupération** (`pickup_contact_*`) remet le colis. Ce n'est pas
+  forcément la même personne : « je commande depuis Marcory pour un ami à
+  Yopougon ». Ne l'appelez jamais « l'expéditeur » dans l'interface.
+
+## Tests
+
+```bash
+cd backend
+npm test          # 34 tests unitaires (commission, plafonds, numéros, vues)
+npm run test:e2e  # 29 tests e2e sur une base jetable (livrechap_test)
+```
+
+Les e2e démarrent une vraie application contre une base créée et détruite
+automatiquement : ils ne touchent jamais la base de développement.
+
+## Migrations
+
+Le schéma est produit **uniquement** par les migrations TypeORM
+(`backend/src/migrations/`).
+
+```bash
+npm run migration:generate src/migrations/NomExplicite   # après une modif d'entité
+npm run migration:run
+npm run migration:revert
+```
+
+En développement, `synchronize` est actif : **toute modification d'entité doit
+s'accompagner d'une migration**, sinon la production dérive.
+
+`database/schema.sql` est un document historique : il diverge du schéma réel
+(TypeORM nomme les enums `<table>_<colonne>_enum`). La source de vérité est la
+migration.
+
+## Ce qui n'est pas fait
+
+- **Notifications push** — le module existe, mais `FCM_MODE=live` est un stub :
+  `firebase-admin` n'est pas branché. **Aucun push ne part réellement.**
+- **SMS** — `SMS_PROVIDER=console` : les codes OTP, le code de livraison envoyé au
+  destinataire et les alertes SOS ne font que s'écrire dans les logs.
+- **Paiements** — `PAYMENTS_MODE=sandbox` : les recharges créditent sans encaisser.
+  L'agrégateur (Genius Pay) n'est pas intégré.
+- **Stockage** — `STORAGE_MODE=local` : les fichiers restent sur le disque.
+- **Litiges** — la table `delivery_incidents` se remplit, mais aucun écran ni
+  endpoint ne permet de les consulter.
+- **Tests mobile / admin** — aucun.
+
+En clair : l'application est complète côté logique métier, mais **aucun
+utilisateur réel ne peut encore s'inscrire** tant que les seams ci-dessus ne sont
+pas branchés sur de vrais fournisseurs.
 
 ## Identité
 
-- Couleur principale : Orange `#FF8A00`
-- Couleur secondaire : Bleu nuit `#14213D`
-- Fond : Blanc `#FFFFFF`
+- Orange `#F97316` — action, rapidité, énergie
+- Bleu nuit `#14213D` — confiance, sécurité
+- Blanc `#FFFFFF` — clarté, simplicité
+- Typographie : Manrope
