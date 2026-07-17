@@ -84,6 +84,28 @@ npm run test:e2e  # 29 tests e2e sur une base jetable (livrechap_test)
 Les e2e démarrent une vraie application contre une base créée et détruite
 automatiquement : ils ne touchent jamais la base de développement.
 
+## Push
+
+Les notifications passent par le **service Expo** (`exp.host`), qui relaie vers
+FCM et APNs. Pas de `firebase-admin` : le jeton natif renvoyé par iOS est un
+jeton APNs brut, qu'un envoi FCM ne sait pas adresser — Expo unifie les deux
+derrière un seul format. **Le backend ne porte aucun secret pour les push.**
+
+Pour activer :
+
+```bash
+cd mobile
+npx eas init            # écrit extra.eas.projectId dans app.json
+npx eas credentials     # une fois : clé FCM (Android) et clé APNs (iOS)
+```
+
+Puis `PUSH_MODE=live` côté backend. Tant qu'aucun `projectId` n'existe, le mobile
+journalise un avertissement et n'enregistre aucun appareil — les push sont
+simplement inactifs, rien ne casse.
+
+Les jetons refusés par Expo (`DeviceNotRegistered`, app désinstallée) sont
+supprimés automatiquement de `device_tokens`.
+
 ## Migrations
 
 Le schéma est produit **uniquement** par les migrations TypeORM
@@ -104,8 +126,9 @@ migration.
 
 ## Ce qui n'est pas fait
 
-- **Notifications push** — le module existe, mais `FCM_MODE=live` est un stub :
-  `firebase-admin` n'est pas branché. **Aucun push ne part réellement.**
+- **Notifications push** — l'envoi via Expo est implémenté (`PUSH_MODE=live`), mais
+  il faut **`eas init`** pour obtenir un `projectId` : sans lui, le mobile
+  n'émet aucun jeton et rien ne part. Voir « Push » ci-dessous.
 - **SMS** — `SMS_PROVIDER=console` : les codes OTP, le code de livraison envoyé au
   destinataire et les alertes SOS ne font que s'écrire dans les logs.
 - **Paiements** — `PAYMENTS_MODE=sandbox` : les recharges créditent sans encaisser.

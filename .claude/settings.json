@@ -9,7 +9,11 @@
       "Bash(grep -vE \"^\\\\s*$|Nest\\\\]|RouterExplorer|RoutesResolver|InstanceLoader|NestFactory|NestApplication|SmsService|console.log\")",
       "Bash(echo \"exit: $?\")",
       "Bash(xargs echo \"  fichiers de test dans dist/ \\(doit etre 0\\) :\")",
-      "Bash(grep -nB2 -A1 \"^DB_PORT\" .env.example)"
+      "Bash(grep -nB2 -A1 \"^DB_PORT\" .env.example)",
+      "Bash(node -e \"console.log\\('  Node:', process.version, '| fetch global:', typeof fetch === 'function'\\)\")",
+      "Bash(node -e \"console.log\\('expo-constants present \\(dep transitive d expo\\):', require\\('./node_modules/expo-constants/package.json'\\).version\\)\")",
+      "Bash(sed -i '/^FIREBASE_/d' backend/.env)",
+      "Read(//c/Users/HP/Documents/Travaux/INNOVATION/LivreChap/livrechap-project/**)"
     ]
   }
 }
