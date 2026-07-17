@@ -106,6 +106,17 @@ simplement inactifs, rien ne casse.
 Les jetons refusés par Expo (`DeviceNotRegistered`, app désinstallée) sont
 supprimés automatiquement de `device_tokens`.
 
+**Accusés de réception.** Expo ne répond à l'envoi que « accepté » : le sort réel
+du push arrive plus tard, via un reçu à réclamer. Un job (`PushReceiptJob`) va le
+chercher et purge les appareils disparus. C'est ce qui révèle les pannes
+silencieuses — notamment `MismatchSenderId` (clé FCM erronée), qui fait échouer
+**tous** les push Android sans qu'aucune erreur n'apparaisse à l'envoi.
+
+```
+PUSH_RECEIPT_DELAY_SECONDS=900   # attendre avant de réclamer le verdict
+PUSH_RECEIPT_SWEEP_SECONDS=300   # fréquence de collecte (mode live uniquement)
+```
+
 ## Migrations
 
 Le schéma est produit **uniquement** par les migrations TypeORM

@@ -424,6 +424,18 @@ CREATE TABLE device_tokens (
 
 CREATE INDEX idx_device_tokens_user ON device_tokens (user_id);
 
+-- Tickets Expo en attente de verdict. Expo répond « accepté » à l'envoi ; le
+-- sort réel du push (livré, appareil disparu, clé FCM invalide) n'est connu
+-- qu'ensuite, en réclamant le reçu avec l'identifiant du ticket. Éphémère :
+-- chaque ligne est supprimée dès son verdict rendu.
+CREATE TABLE push_receipts (
+  ticket_id VARCHAR(100) PRIMARY KEY,
+  token TEXT NOT NULL,           -- pour purger l'appareil s'il a disparu
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_push_receipts_created_at ON push_receipts (created_at);
+
 -- ============================================================
 -- NOTES ET BADGES
 -- ============================================================

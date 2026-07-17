@@ -1,8 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, LessThanOrEqual, Repository } from 'typeorm';
 
+import { PushReceipt } from './entities/push-receipt.entity';
 import { ExpoPushClient } from './expo-push.client';
 
 import {
@@ -35,6 +36,8 @@ export class NotificationsService {
   constructor(
     @InjectRepository(DeviceToken)
     private readonly deviceTokens: Repository<DeviceToken>,
+    @InjectRepository(PushReceipt)
+    private readonly receipts: Repository<PushReceipt>,
     private readonly config: ConfigService,
     private readonly expoPush: ExpoPushClient,
   ) {
@@ -126,10 +129,51 @@ export class NotificationsService {
 
     // Purge des appareils devenus injoignables (app désinstallée/réinstallée).
     if (outcome.invalidTokens.length > 0) {
-      await this.deviceTokens.delete({ token: In(outcome.invalidTokens) });
-      this.logger.log(
-        `${outcome.invalidTokens.length} jeton(s) périmé(s) supprimé(s).`,
+      await this.purgeTokens(outcome.invalidTokens);
+    }
+
+    // « Accepté » ne veut pas dire « livré » : on garde les tickets pour aller
+    // chercher le verdict réel plus tard (voir PushReceiptJob).
+    if (outcome.tickets.length > 0) {
+      await this.receipts.save(
+        outcome.tickets.map((t) =>
+          this.receipts.create({ ticketId: t.ticketId, token: t.token }),
+        ),
       );
     }
+  }
+
+  // --- Reçus ---------------------------------------------------------------
+
+  // Réclame le verdict des tickets assez vieux pour qu'Expo l'ait rendu.
+  // Appelé périodiquement par PushReceiptJob.
+  async collectReceipts(olderThanSeconds: number, limit = 500): Promise<number> {
+    const cutoff = new Date(Date.now() - olderThanSeconds * 1000);
+    const pending = await this.receipts.find({
+      where: { createdAt: LessThanOrEqual(cutoff) },
+      take: limit,
+    });
+    if (pending.length === 0) {
+      return 0;
+    }
+
+    const verdicts = await this.expoPush.fetchReceipts(
+      pending.map((p) => ({ ticketId: p.ticketId, token: p.token })),
+    );
+
+    if (verdicts.invalidTokens.length > 0) {
+      await this.purgeTokens(verdicts.invalidTokens);
+    }
+    // Verdict rendu = ticket clos. Ceux qu'Expo n'a pas encore tranchés restent
+    // en base et seront réclamés au prochain passage.
+    if (verdicts.settled.length > 0) {
+      await this.receipts.delete({ ticketId: In(verdicts.settled) });
+    }
+    return verdicts.settled.length;
+  }
+
+  private async purgeTokens(tokens: string[]): Promise<void> {
+    await this.deviceTokens.delete({ token: In(tokens) });
+    this.logger.log(`${tokens.length} jeton(s) périmé(s) supprimé(s).`);
   }
 }

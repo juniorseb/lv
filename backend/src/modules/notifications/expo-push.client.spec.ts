@@ -121,4 +121,94 @@ describe('ExpoPushClient.send', () => {
     const out = await new ExpoPushClient().send([msg('ExponentPushToken[a]')]);
     expect(out.sent).toBe(0);
   });
+
+  it('conserve les tickets acceptés, pour aller chercher le verdict plus tard', async () => {
+    global.fetch = mockFetch([
+      { data: [{ status: 'ok', id: 'ticket-1' }] },
+    ]) as never;
+    const out = await new ExpoPushClient().send([msg('ExponentPushToken[a]')]);
+    // « Accepté » n'est pas « livré » : sans le ticket, on ne saurait jamais.
+    expect(out.tickets).toEqual([
+      { ticketId: 'ticket-1', token: 'ExponentPushToken[a]' },
+    ]);
+  });
+});
+
+describe('ExpoPushClient.fetchReceipts', () => {
+  const original = global.fetch;
+  afterEach(() => {
+    global.fetch = original;
+  });
+
+  const pending = [
+    { ticketId: 't1', token: 'ExponentPushToken[a]' },
+    { ticketId: 't2', token: 'ExponentPushToken[b]' },
+  ];
+
+  it('clôt les tickets livrés sans rien purger', async () => {
+    global.fetch = mockFetch([
+      { data: { t1: { status: 'ok' }, t2: { status: 'ok' } } },
+    ]) as never;
+
+    const v = await new ExpoPushClient().fetchReceipts(pending);
+    expect(v.settled.sort()).toEqual(['t1', 't2']);
+    expect(v.invalidTokens).toEqual([]);
+  });
+
+  it('purge l’appareil quand le reçu dit qu’il a disparu', async () => {
+    global.fetch = mockFetch([
+      {
+        data: {
+          t1: { status: 'ok' },
+          t2: {
+            status: 'error',
+            message: 'not registered',
+            details: { error: 'DeviceNotRegistered' },
+          },
+        },
+      },
+    ]) as never;
+
+    const v = await new ExpoPushClient().fetchReceipts(pending);
+    expect(v.invalidTokens).toEqual(['ExponentPushToken[b]']);
+    // Les deux tickets sont tranchés : plus rien à réclamer.
+    expect(v.settled.sort()).toEqual(['t1', 't2']);
+  });
+
+  it('signale une clé FCM invalide SANS purger les appareils', async () => {
+    // MismatchSenderId = mauvaise config : tous les push Android échouent. Les
+    // appareils sont sains — les purger effacerait toute la base d'appareils.
+    global.fetch = mockFetch([
+      {
+        data: {
+          t1: {
+            status: 'error',
+            message: 'sender id mismatch',
+            details: { error: 'MismatchSenderId' },
+          },
+        },
+      },
+    ]) as never;
+
+    const v = await new ExpoPushClient().fetchReceipts([pending[0]]);
+    expect(v.invalidTokens).toEqual([]);
+    expect(v.settled).toEqual(['t1']);
+  });
+
+  it('laisse en attente les tickets qu’Expo n’a pas encore tranchés', async () => {
+    // Expo ne renvoie que t1 : t2 doit rester réclamable au prochain passage.
+    global.fetch = mockFetch([{ data: { t1: { status: 'ok' } } }]) as never;
+
+    const v = await new ExpoPushClient().fetchReceipts(pending);
+    expect(v.settled).toEqual(['t1']);
+    expect(v.settled).not.toContain('t2');
+  });
+
+  it('ne clôt aucun ticket si Expo est injoignable', async () => {
+    global.fetch = jest.fn().mockRejectedValue(new Error('ENOTFOUND')) as never;
+    const v = await new ExpoPushClient().fetchReceipts(pending);
+    // Rien de perdu : on réessaiera.
+    expect(v.settled).toEqual([]);
+    expect(v.invalidTokens).toEqual([]);
+  });
 });

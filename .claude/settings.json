@@ -13,7 +13,9 @@
       "Bash(node -e \"console.log\\('  Node:', process.version, '| fetch global:', typeof fetch === 'function'\\)\")",
       "Bash(node -e \"console.log\\('expo-constants present \\(dep transitive d expo\\):', require\\('./node_modules/expo-constants/package.json'\\).version\\)\")",
       "Bash(sed -i '/^FIREBASE_/d' backend/.env)",
-      "Read(//c/Users/HP/Documents/Travaux/INNOVATION/LivreChap/livrechap-project/**)"
+      "Read(//c/Users/HP/Documents/Travaux/INNOVATION/LivreChap/livrechap-project/**)",
+      "Bash(xargs echo \"  ->\")",
+      "Bash(DB_NAME=lv_gen npm run migration:run)"
     ]
   }
 }
