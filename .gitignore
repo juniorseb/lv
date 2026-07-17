@@ -1,6 +1,21 @@
 node_modules/
 dist/
 .env
+.env.local
+.env.*.local
 *.log
 .expo/
 .DS_Store
+
+# Secrets — ne JAMAIS committer.
+# Le compte de service Firebase (FCM V1) se téléverse chez Expo via
+# `eas credentials` ; il n'a rien à faire dans le dépôt ni dans le backend.
+*firebase-adminsdk*.json
+*service-account*.json
+*serviceAccount*.json
+google-services.json
+GoogleService-Info.plist
+*.p8
+*.p12
+*.pem
+*.key
